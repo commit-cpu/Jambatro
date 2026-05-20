@@ -288,8 +288,9 @@ SMODS.Joker {
     loc_txt = {
         name = "Awkward Joker",
         text = {
-            '{C:red}+3{} Mult for each',
-            'empty played hand slot',
+            '{C:red}+3{} Mult for every',
+            '{C:attention}empty space{} in',
+            'played hand',
             '{C:inactive}(ex: Hand with 2 cards = {}{C:mult}+9{}{C:inactive} Mult)'
         }
     },
@@ -638,7 +639,7 @@ SMODS.Joker {
     pos = { x = 1, y = 1 },
     pools = { ["Jambatro"] = true, ["Jambatro_R"] = true },
 
-    config = { extra = { odds = 3, xmult = 2 } },
+    config = { extra = { odds = 2, xmult = 1.7 } },
 
     loc_vars = function(self, info_queue, card)
         local numerator, denominator = SMODS.get_probability_vars(card, 1, card.ability.extra.odds, 'tyrsfall')
@@ -1196,7 +1197,7 @@ SMODS.Joker {
     loc_txt = {
         name = 'Monochromatic Joker',
         text = {
-            'Debuffs all suits except for {C:attention}#1#{}',
+            'Debuffs all suits except for {V:1}#1#{}',
             '{X:red,C:white}X#2#{} Mult',
             '{C:inactive}(Suit changes at the end of the round){}'
         }
@@ -1214,7 +1215,7 @@ SMODS.Joker {
     config = { extra = { suit = 'Hearts', xmult = 3, suit_number = 1 } },
 
     loc_vars = function(self, info_queue, card)
-        return { vars = { card.ability.extra.suit, card.ability.extra.xmult } }
+        return { vars = { card.ability.extra.suit, card.ability.extra.xmult, colours = { G.C.SUITS[card.ability.extra.suit] } } }
     end,
 
     calculate = function(self, card, context)
@@ -1269,12 +1270,12 @@ SMODS.Joker {
     loc_txt = {
         name = 'Candy Crusher',
         text = {
-            '{C:red}+#1#{} Mult for each matching',
-            'card over a {C:attention}Pair',
+            'Most common rank in played',
+            'hand gives {C:red}+#1#{} Mult',
             'Creates a random {C:attention}enhanced{} card if',
-            'hand contains a {C:attention}Four of a Kind',
+            'hand contains a {C:attention}#2#',
             'Creates a {C:blue}Spectral{} card',
-            'if hand is a {C:attention}Flush Five',
+            'if hand is a {C:attention}#3#',
             '{C:inactive}(Must have room){}',
         }
     },
@@ -1288,17 +1289,57 @@ SMODS.Joker {
     pos = { x = 3, y = 7 },
     pools = { ["Jambatro"] = true },
 
-    config = { extra = { mult = 8, making_card = false, type_3 = 'Three of a Kind', type_4 = 'Four of a Kind' } },
+    config = { extra = { mult = 3, enhanced = false, type_4 = 'Four of a Kind', type_5 = 'Flush Five' } },
 
     loc_vars = function(self, info_queue, card)
-        return { vars = { card.ability.extra.mult, } }
+        return { vars = { card.ability.extra.mult, card.ability.extra.type_4, card.ability.extra.type_5 } }
     end,
     
     calculate = function(self, card, context)
+        if context.individual and context.cardarea == G.play and context.other_card then
+            local ranks = {}
+            for i = 1, #context.scoring_hand do
+                ranks[#ranks + 1] = context.scoring_hand[i]:get_id()
+            end
+            local counts = {}
+            local maxCount = 0
+            local mode = nil
+            for _, value in ipairs(ranks) do
+                counts[value] = (counts[value] or 0) + 1
+                if counts[value] > maxCount then
+                    maxCount = counts[value]
+                    mode = value
+                end
+            end
+            if context.other_card:get_id() == mode then
+                return {
+                    mult = card.ability.extra.mult
+                }
+            end
+        end
+
         if context.joker_main then
-            if context.scoring_name == 'Five of a Kind' or context.scoring_name == 'Flush Five' then
-                card.ability.extra.making_card = true
-                if context.scoring_name == 'Flush Five' and #G.consumeables.cards + G.GAME.consumeable_buffer < G.consumeables.config.card_limit then
+            card.ability.extra.enhanced = false
+            card.ability.extra.spectral = false
+            local ranks = {}
+            for i = 1, #context.scoring_hand do
+                ranks[#ranks + 1] = context.scoring_hand[i]:get_id()
+            end
+            local counts = {}
+            local maxCount = 0
+            local mode = nil
+            for _, value in ipairs(ranks) do
+                counts[value] = (counts[value] or 0) + 1
+                if counts[value] > maxCount then
+                    maxCount = counts[value]
+                    mode = value
+                end
+            end
+            if counts[mode] >= 4 then
+                card.ability.extra.enhanced = true
+            end
+            if counts[mode] >= 5 and next(context.poker_hands['Flush']) then
+                if #G.consumeables.cards + G.GAME.consumeable_buffer < G.consumeables.config.card_limit then
                     G.GAME.consumeable_buffer = G.GAME.consumeable_buffer + 1
                     G.E_MANAGER:add_event(Event({
                         func = (function()
@@ -1317,55 +1358,43 @@ SMODS.Joker {
                         end)
                     }))
                     return nil, true
-                    end
-                return {
-                    mult = card.ability.extra.mult * 3
-                }
-            end
-            if next(context.poker_hands[card.ability.extra.type_4]) then
-                card.ability.extra.making_card = true
-                return {
-                    mult = card.ability.extra.mult * 2
-                }
-            end
-            if next(context.poker_hands[card.ability.extra.type_3]) then
-                return {
-                    mult = card.ability.extra.mult
-                }
+                end
             end
         end
-        if (context.drawing_cards or (context.end_of_round and context.game_over == false and context.main_eval)) and card.ability.extra.making_card then
-            card.ability.extra.making_card =  false
+        if (context.drawing_cards or (context.end_of_round and context.game_over == false and context.main_eval)) and card.ability.extra.enhanced then
+            card.ability.extra.enhanced =  false
             local cen_pool = {}
             for _, enhancement_center in pairs(G.P_CENTER_POOLS["Enhanced"]) do
                 cen_pool[#cen_pool + 1] = enhancement_center
             end
             local enhancement = pseudorandom_element(cen_pool, 'spe_card')
             local king = SMODS.create_card { set = "Playing Card", area = G.discard, enhancement = enhancement.key }
-                G.playing_card = (G.playing_card and G.playing_card + 1) or 1
-                king.playing_card = G.playing_card
-                table.insert(G.playing_cards, king)
+            G.playing_card = (G.playing_card and G.playing_card + 1) or 1
+            king.playing_card = G.playing_card
+            table.insert(G.playing_cards, king)
 
-                G.E_MANAGER:add_event(Event({
-                    func = function()
-                        king:start_materialize({ G.C.SECONDARY_SET.Enhanced })
-                        G.play:emplace(king)
-                        return true
-                    end
-                }))
-                return {
-                    message = 'Juicy!',
-                    func = function()
-                        G.E_MANAGER:add_event(Event({
-                            func = function()
-                                G.deck.config.card_limit = G.deck.config.card_limit + 1
-                                return true
-                            end
-                        }))
-                        draw_card(G.play, G.deck, 90, 'up')
-                        SMODS.calculate_context({ playing_card_added = true, cards = { king } })
-                    end
-                }
+            G.E_MANAGER:add_event(Event({
+                func = function()
+                    king:start_materialize({ G.C.SECONDARY_SET.Enhanced })
+                    G.play:emplace(king)
+                    return true
+                end
+            }))
+            print('triggered!')
+            return {
+                message = 'Juicy!',
+                func = function()
+                    G.E_MANAGER:add_event(Event({
+                        func = function()
+                            G.deck.config.card_limit = G.deck.config.card_limit + 1
+                            return true
+                        end
+                    }))
+                    draw_card(G.play, G.deck, 90, 'up')
+                    SMODS.calculate_context({ playing_card_added = true, cards = { king } })
+                end
+            }
+            
         end
     end
 }
@@ -1392,7 +1421,7 @@ SMODS.Joker {
     soul_pos = { x = 5, y = 6 },
     pools = { ["Jambatro"] = true },
 
-    config = { extra = { odds = 4 } },
+    config = { extra = { odds = 3 } },
 
     loc_vars = function(self, info_queue, card)
         local numerator, denominator = SMODS.get_probability_vars(card, 1, card.ability.extra.odds, "micro")
@@ -2372,7 +2401,7 @@ SMODS.Joker {
             'Play each {C:attention}digit{} of the new number',
             'for the {C:attention}Emergency Services{}!',
             'Gain {C:chips}+#1#{} for every digit played',
-            '{C:inactive}(Currently {C:chips}#4#{}{C:inactive} Chips){}',
+            '{C:inactive}(Currently {C:chips}+#4#{}{C:inactive} Chips){}',
             '{C:inactive}(Next digit: {C:attention}#2#{}{C:inactive}){}',
             '{C:inactive}Can count multiple digits per hand{}'
         }
@@ -3235,7 +3264,7 @@ SMODS.Joker {
     loc_txt = {
         name = "Chip Shop",
         text = {
-            '{C:money}-$#2#{} and gain {C:chips}+6{} chips',
+            '{C:money}-$#2#{} and gain {C:chips}+8{} chips',
             'at the {C:attention}start of the round{}',
             '{C:inactive}(Currently {}{C:chips}+#1#{} {C:inactive}Chips){}',
             '{C:inactive}Wont accept money below 0'
@@ -4322,7 +4351,7 @@ SMODS.Joker {
         }
     },
     blueprint_compat = false,
-    rarity = 2,
+    rarity = 3,
     cost = 7,
     discovered = true,
     eternal_compat = true,
@@ -5612,7 +5641,7 @@ SMODS.Joker {
 SMODS.Joker {
     key = 'jam_random',
     loc_txt = {
-        name = "r/iamveryrandom",
+        name = "iamveryrandom",
         text = {
             '{C:green}#1# in #2#{} chance to give a random {C:purple}Tarot{} card when selecting a blind',
             '{C:green}#3# in #4#{} chance to give between {C:red}+#9#{} and {C:red}+#10#{} Mult',
@@ -6876,6 +6905,7 @@ SMODS.Blind {
     mult = 2,
     debuff = { h_size_ge = 4, h_size_le = 4 },
     atlas = 'jam_blinds',
+    set = 'Blind',
     pos = { x = 0, y = 0 },
     discovered = true,
     boss = { min = 1 },
@@ -6894,6 +6924,7 @@ SMODS.Blind {
     dollars = 5,
     mult = 2,
     atlas = 'jam_blinds',
+    set = 'Blind',
     pos = { x = 0, y = 3 },
     discovered = true,
     boss = { min = 4 },
@@ -6907,7 +6938,7 @@ SMODS.Blind {
             end
         end
     end,
-    disable = function(self)
+    disable = function(self, context)
         if context.debuff_card and (context.debuff_card.ability.set == 'Default' and not context.debuff_card.seal and not context.debuff_card.edition and not next(SMODS.get_enhancements(context.debuff_card))) then
             return { debuff = false }
         end
@@ -6928,6 +6959,7 @@ SMODS.Blind {
     dollars = 5,
     mult = 2,
     atlas = 'jam_blinds',
+    set = 'Blind',
     pos = { x = 0, y = 1 },
     discovered = true,
     boss = { min = 2 },
@@ -6965,6 +6997,7 @@ SMODS.Blind {
     dollars = 5,
     mult = 2,
     atlas = 'jam_blinds',
+    set = 'Blind',
     pos = { x = 0, y = 2 },
     discovered = true,
     boss = { min = 5 },
@@ -6978,7 +7011,7 @@ SMODS.Blind {
             end
         end
     end,
-    disable = function(self)
+    disable = function(context, self)
         if context.debuff_card and context.debuff_card.edition then
             return { debuff = false }
         end
@@ -7003,7 +7036,7 @@ SMODS.Booster {
     draw_hand = false,
     cost = 5,
     discovered = true,
-    weight = 7,
+    weight = 5,
     pools = { ["Jamboosters"] = true },
     config = { extra = 2, choose = 1 },
     create_card = function(self, card)
@@ -7022,11 +7055,12 @@ SMODS.Booster {
         group_name = 'Balammbo'
     },
     atlas = 'jam_boosters',
+    set = 'Booster',
     pos = { x = 0, y = 0 },
     draw_hand = false,
     cost = 5,
     discovered = true,
-    weight = 7,
+    weight = 3,
     pools = { ["Jamboosters"] = true },
     config = { extra = 2, choose = 1 },
     create_card = function(self, card)
@@ -7045,11 +7079,12 @@ SMODS.Booster {
         group_name = 'Fortnite'
     },
     atlas = 'jam_boosters',
+    set = 'Booster',
     pos = { x = 1, y = 0 },
     draw_hand = false,
     cost = 6,
     discovered = true,
-    weight = 7,
+    weight = 3,
     pools = { ["Jamboosters"] = true },
     config = { extra = 5, choose = 1 },
     create_card = function(self, card)
@@ -7068,11 +7103,12 @@ SMODS.Booster {
         group_name = 'Insert Text Here'
     },
     atlas = 'jam_boosters',
+    set = 'Booster',
     pos = { x = 2, y = 0 },
     draw_hand = false,
     cost = 7,
     discovered = true,
-    weight = 5,
+    weight = 3,
     pools = { ["Jamboosters"] = true },
     config = { extra = 7, choose = 2 },
     create_card = function(self, card)
@@ -7091,11 +7127,12 @@ SMODS.Booster {
         group_name = 'The Bugs'
     },
     atlas = 'jam_boosters',
+    set = 'Booster',
     pos = { x = 3, y = 0 },
     draw_hand = true,
     cost = 7,
     discovered = true,
-    weight = 5,
+    weight = 3,
     pools = { ["Jamboosters"] = true },
     config = { extra = 2, choose = 1 },
     create_card = function(self, card)
@@ -7114,11 +7151,12 @@ SMODS.Booster {
         group_name = 'The Bugs'
     },
     atlas = 'jam_boosters',
+    set = 'Booster',
     pos = { x = 3, y = 0 },
     draw_hand = true,
     cost = 7,
     discovered = true,
-    weight = 5,
+    weight = 3,
     pools = { ["Jamboosters"] = true },
     config = { extra = 2, choose = 1 },
     create_card = function(self, card)
@@ -7137,11 +7175,12 @@ SMODS.Booster {
         group_name = 'under your skin.'
     },
     atlas = 'jam_boosters',
+    set = 'Booster',
     pos = { x = 4, y = 0 },
     draw_hand = true,
     cost = 7,
     discovered = true,
-    weight = 5,
+    weight = 3,
     pools = { ["Jamboosters"] = true },
     config = { extra = 3, choose = 1 },
     create_card = function(self, card)
@@ -7160,11 +7199,12 @@ SMODS.Booster {
         group_name = 'Crawlies'
     },
     atlas = 'jam_boosters',
+    set = 'Booster',
     pos = { x = 4, y = 0 },
     draw_hand = true,
     cost = 7,
     discovered = true,
-    weight = 5,
+    weight = 3,
     pools = { ["Jamboosters"] = true },
     config = { extra = 4, choose = 2 },
     create_card = function(self, card)
@@ -7209,6 +7249,7 @@ SMODS.Tag {
     },
     min_ante = 2,
     atlas = 'jam_tags',
+    set = 'Tag',
     pos = { x = 0, y = 0 },
     discovered = true,
     loc_vars = function(self, info_queue, tag)
@@ -7248,6 +7289,7 @@ SMODS.Tag {
     },
     min_ante = 2,
     atlas = 'jam_tags',
+    set = 'Tag',
     pos = { x = 2, y = 0 },
     discovered = true,
     loc_vars = function(self, info_queue, tag)
@@ -7286,6 +7328,7 @@ SMODS.Tag {
         },
     },
     atlas = 'jam_tags',
+    set = 'Tag',
     pos = { x = 1, y = 0 },
     discovered = true,
     config = { odds = 3 },
@@ -7331,6 +7374,7 @@ SMODS.Tag {
         },
     },
     atlas = 'jam_tags',
+    set = 'Tag',
     pos = { x = 0, y = 1 },
     discovered = true,
     config = { odds = 3 },
@@ -7380,6 +7424,7 @@ SMODS.Seal {
         },
     },
     atlas = 'Seals',
+    set = 'Seal',
     pos = { x = 0, y = 0 },
     discovered = true,
     badge_colour = G.C.RED,
@@ -7414,6 +7459,7 @@ SMODS.Seal {
         },
     },
     atlas = 'Seals',
+    set = 'Seal',
     pos = { x = 1, y = 0 },
     discovered = true,
     badge_colour = G.C.PURPLE,
