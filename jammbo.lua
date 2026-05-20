@@ -6001,6 +6001,41 @@ SMODS.Joker {
     end
 }
 
+SMODS.Joker {
+    key = "jam_bug_catcher",
+    loc_txt = {
+        name = 'Bug Catcher',
+        text = {
+            '{C:chips}+#1#{} Chip for every',
+            '{V:1}Bug{} card used this run',
+            '{C:inactive}(Currently{}{C:chips} +#2#{} {C:inactive}Chips){}'
+        }
+    },
+    blueprint_compat = true,
+    rarity = 1,
+    cost = 4,
+    discovered = true,
+    eternal_compat = true,
+    perishable_compat = true,
+    atlas = 'Jammbo',
+    pos = { x = 10, y = 6 },
+
+    config = { extra = { chips = 4 } },
+
+    loc_vars = function(self, info_queue, card)
+        local chips_total = (G.GAME.consumeable_usage_total and G.GAME.consumeable_usage_total.jam_bugs or 0) * card.ability.extra.chips
+        return { vars = { card.ability.extra.chips, chips_total, colours = {HEX("6F785A")} } }
+    end,
+
+    calculate = function (self, card, context)
+        if context.joker_main then
+            return {
+                chips = (G.GAME.consumeable_usage_total and G.GAME.consumeable_usage_total.jam_bugs or 0) * 4
+            }
+        end
+    end,
+}
+
 
 
 --Consumables
