@@ -7036,7 +7036,7 @@ SMODS.Booster {
     draw_hand = false,
     cost = 5,
     discovered = true,
-    weight = 5,
+    weight = 0.7,
     pools = { ["Jamboosters"] = true },
     config = { extra = 2, choose = 1 },
     create_card = function(self, card)
@@ -7060,7 +7060,7 @@ SMODS.Booster {
     draw_hand = false,
     cost = 5,
     discovered = true,
-    weight = 3,
+    weight = 0.7,
     pools = { ["Jamboosters"] = true },
     config = { extra = 2, choose = 1 },
     create_card = function(self, card)
@@ -7084,7 +7084,7 @@ SMODS.Booster {
     draw_hand = false,
     cost = 6,
     discovered = true,
-    weight = 3,
+    weight = 0.7,
     pools = { ["Jamboosters"] = true },
     config = { extra = 5, choose = 1 },
     create_card = function(self, card)
@@ -7108,7 +7108,7 @@ SMODS.Booster {
     draw_hand = false,
     cost = 7,
     discovered = true,
-    weight = 3,
+    weight = 0.5,
     pools = { ["Jamboosters"] = true },
     config = { extra = 7, choose = 2 },
     create_card = function(self, card)
@@ -7180,7 +7180,7 @@ SMODS.Booster {
     draw_hand = true,
     cost = 7,
     discovered = true,
-    weight = 3,
+    weight = 1,
     pools = { ["Jamboosters"] = true },
     config = { extra = 3, choose = 1 },
     create_card = function(self, card)
@@ -7204,7 +7204,7 @@ SMODS.Booster {
     draw_hand = true,
     cost = 7,
     discovered = true,
-    weight = 3,
+    weight = 0.5,
     pools = { ["Jamboosters"] = true },
     config = { extra = 4, choose = 2 },
     create_card = function(self, card)
@@ -7228,7 +7228,7 @@ SMODS.Booster {
 --     draw_hand = false,
 --     cost = 7,
 --     discovered = true,
---     weight = 5,
+--     weight = 100,
 --     config = { extra = 3, choose = 1 },
 --     create_card = function(self, card)
 --         return {set = "Jamboosters", area = G.pack_cards, skip_materialize = true, soulable = false, key_append = "jammbo"}
